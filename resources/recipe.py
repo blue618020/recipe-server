@@ -5,6 +5,8 @@ from mysql.connector import Error
 
 from mysql_connection import get_connection
 
+from flask_jwt_extended import get_jwt_identity, jwt_required
+
 # Resource : API를 동작하게 만들어주는 클래스
 # API 동작하는 코드를 만들기 위해서는 
 # class(클래스)를 만들어야 함
@@ -21,6 +23,7 @@ from mysql_connection import get_connection
 class RecipeListResource(Resource):  
     # 클래스 이름을 지어주고 Resource 상속함
 
+    @jwt_required()
     def post(self):
         # 포스트로 요청한것을 처리하는 코드 작성하기
         # self 필수
@@ -39,6 +42,12 @@ class RecipeListResource(Resource):
         data = request.get_json()
         print(data) 
 
+
+        # 1-1. 헤더에 담긴 JWT 토큰을 받아오기
+        user_id = get_jwt_identity()
+
+        print(user_id)
+  
         # 2. 받아온 데이터를 DB에 저장한다.
         try:
             # 2-0. 데이터베이스 만든걸 연결
@@ -48,18 +57,20 @@ class RecipeListResource(Resource):
             # MySQL 레시피_디비에서 작성한걸 여기로 복붙함
             # 쿼리문은 MySQL에서 작성하고 문제없는지 실행 확인한 다음 여기로 가져오는거래
             ## 중요!!!!! : 컬럼과 매칭되는 데이터만 %s 로 바꿔줌!!
-            query = ''' insert into recipe
-                        (name, description, num_of_servings, 
-                        cook_time, directions, is_publish)
-                        values
-                        (%s, %s, %s, %s, %s, %s);
-                    '''
             
-            # 2-3. 쿼리에 매칭되는 변수 처리 중요!! 튜플로 처리해주기!
+            query = '''insert into recipe
+                    (name, description, num_of_servings, cook_time,
+                        directions , is_publish, user_id)
+                    values
+                    (%s, %s, %s, %s, %s, %s, %s);'''
+            
+            # 2-3. 쿼리에 매칭되는 변수 처리!  중요! 튜플로 처리해준다!
             # %s 에 들어갈 내용을 아래 내용으로 넣어달라는 것
             record = (data['name'], data['description'], data['num_of_servings'],
-                      data['cook_time'], data['description'], data['is_publish'])
+                      data['cook_time'], data['directions'], data['is_publish'], 
+                      user_id)
             
+
             # 2-4. 커서를 가져온다
             cursor = connection.cursor()
 
@@ -71,7 +82,7 @@ class RecipeListResource(Resource):
 
             # 2-7. 자원해제
             cursor.close()
-            connection.colse()
+            connection.close()
 
         # 3. 에러났다면 에러 알려주고, 그렇지 않으면 잘 저장되었다고 알려준다.
         # 위 코드에서 에러났을때 안내해주는거
@@ -96,8 +107,14 @@ class RecipeListResource(Resource):
             connection = get_connection()
 
             # 2-2. 쿼리문 만들기
-            query = ''' select * from recipe
-                        order by created_at desc; '''
+            # query = ''' select * from recipe
+            #             order by created_at desc; '''
+
+            query = ''' select r.*, u.username
+                        from recipe r
+                        join user u
+                            on r.user_id = u.id
+                        where is_publish =1; '''
             
             # 2-3. 변수처리할 부분은 변수처리하기
             # 일단 없음
@@ -148,8 +165,15 @@ class RecipeResource(Resource):
         try:
             connection = get_connection()
 
-            query = ''' select * from recipe
-                        where id = %s; '''
+            # query = ''' select * from recipe
+            #             where id = %s; '''
+
+            query = '''select r.*, u.username
+                        from recipe r
+                        join user u
+                            on r.user_id = u.id
+                        where r.id = %s; '''
+
             record = (recipe_id,) 
                     # %s에 들어갈 값은 reciope_id
                     # 튜플로 값을 가져와야하기 때문에 콤마 넣음
@@ -183,7 +207,7 @@ class RecipeResource(Resource):
                         'count': len(result_list),
                         'items' : result_list[0]}, 200
         
-
+    @jwt_required()
     def put(self, recipe_id):
         
         # 1. 클라이언트로부터 데이터를 받아오기
@@ -193,6 +217,9 @@ class RecipeResource(Resource):
         data = request.get_json()
         print(data)
 
+        # user_id를 받아온다
+        user_id = get_jwt_identity()
+
         # 2. 데이터베이스에 업데이트 하기
         try:
             connection = get_connection()
@@ -200,12 +227,12 @@ class RecipeResource(Resource):
                           set name = %s, description = %s,
 			              num_of_servings = %s, cook_time = %s,
                           directions = %s, is_publish = %s
-                        where id = %s; '''
+                        where id = %s and user_id = %s; '''
             
             recode = (data['name'], data['description'], 
                       data['num_of_servings'], data['cook_time'], 
                       data['directions'], data['is_publish'],
-                      recipe_id)
+                      recipe_id, user_id)
             
             corsor = connection.cursor()
             
@@ -223,19 +250,22 @@ class RecipeResource(Resource):
         # 결과를 응답하기
         return {'result':'success'}
     
-
+    @jwt_required()
     def delete(self, recipe_id):
         # 1. 클라이언트로부터 데이터를 받아오기
         print(recipe_id)
+
+        # 유저아이디 
+        user_id = get_jwt_identity()
 
         # DB에서 삭제하기
         try:
             connection = get_connection()
 
             query = ''' delete from recipe
-                        where id = %s; '''
+                        where id = %s and user_id = %s; '''
             
-            record = (recipe_id, )
+            record = (recipe_id, user_id)
 
             cursor = connection.cursor()
 
