@@ -283,3 +283,90 @@ class RecipeResource(Resource):
         # 결과를 응답하기
         return {'result':'success'}
         
+
+
+class RecipePublishResource(Resource): 
+    
+    @jwt_required() # 헤더확인
+    def put(self, recipe_id):
+        
+        # 1.클라이언트로부터 레시피를 받아오기 
+        # jwt 토큰
+        user_id = get_jwt_identity()
+        
+        # 2. DB 처리하기
+        try :
+            connection = get_connection()
+            query = '''update recipe
+                    set is_publish =1
+                    where id = %s and user_id = %s; ''' 
+            record = (recipe_id, user_id)
+            cursor = connection.cursor()
+            cursor.execute(query, record)
+            connection.commit()
+            cursor.close()
+            connection.close()
+
+        except Error as e:
+            print(e)
+            return {'result':'fall', 'error':str(e)}, 500
+
+
+    @jwt_required()
+    def delete(self, recipe_id):
+        
+        # 1.클라이언트로부터 레시피를 받아오기 
+        # jwt 토큰
+        user_id = get_jwt_identity()
+        
+        # 2. DB 처리하기
+        try :
+            connection = get_connection()
+            query = '''update recipe
+                    set is_publish =0
+                    where id = %s and user_id = %s; ''' 
+            record = (recipe_id, user_id)
+            cursor = connection.cursor()
+            cursor.execute(query, record)
+            connection.commit()
+            cursor.close()
+            connection.close()
+
+        except Error as e:
+            print(e)
+            return {'result':'fall', 'error':str(e)}, 500
+        
+
+class MyRecipeListResource(Resource):
+
+    @jwt_required()
+    def get(selt):
+        user_id = get_jwt_identity()
+
+        try:
+            connection = get_connection()
+            query = '''select * 
+                    from recipe
+                    where user_id = %s;'''
+            record = (user_id, ) # 튜플로 받아야하니깐 콤마 잊지말기.
+            cursor = connection.cursor(dictionary=True)
+            cursor.execute(query, record)
+            result_list = cursor.fetchall()  # 리스트 가져오기
+            cursor.close()
+            connection.close()
+
+        except Error as e:
+            print(e)
+            return {'result':'fall', 'error':str(e)}, 500
+        
+        print(result_list)
+
+        i=0  # datetime 타입 변경
+        for row in result_list:
+            result_list[i]['created_at']= row['created_at'].isoformat()
+            result_list[i]['updated_at'] = row['updated_at'].isoformat()
+            i = i+1
+            
+        return {'result':'success', 'count':len(result_list), 'items':result_list}
+            # 개수(count)는 몇개(len)고 리스트 내용(items)은 result_list 라는 걸 알려줘야함
+

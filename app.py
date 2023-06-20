@@ -2,7 +2,7 @@
 from flask import Flask  # 대소문자 주의!
 from flask_restful import Api
 from config import Config
-from resources.recipe import RecipeListResource, RecipeResource
+from resources.recipe import MyRecipeListResource, RecipeListResource, RecipePublishResource, RecipeResource
 from resources.user import UserLoginResource, UserLogoutResource, UserRegisterResource, jwt_blocklist
 from flask_jwt_extended import JWTManager
 
@@ -25,17 +25,20 @@ def check_if_token_is_revoked(jwt_header, jwt_payload):
 api = Api(app)  # 변수생성
 
 # 경로와 Api 동작코드(Resource/리솔스)를 연결하기
-api.add_resource(RecipeListResource, '/recipes')
-               # recipe.py에서 만든거
-               
-api.add_resource(RecipeResource, '/recipes/<int:recipe_id>')
+api.add_resource(RecipeListResource, '/recipes')  # recipe.py
+                              
+api.add_resource(RecipeResource, '/recipes/<int:recipe_id>') # recipe.py
                             # recipe_id의 숫자 가져오기
 
-api.add_resource(UserRegisterResource, '/user/register')
+api.add_resource(UserRegisterResource, '/user/register') # user.py  
 
-api.add_resource(UserLoginResource, '/user/login')
+api.add_resource(UserLoginResource, '/user/login') # user.py  
 
-api.add_resource(UserLogoutResource, '/user/logout')
+api.add_resource(UserLogoutResource, '/user/logout') # user.py  
+
+api.add_resource(RecipePublishResource, '/recipes/<int:recipe_id>/publish') # recipe.py
+
+api.add_resource(MyRecipeListResource, '/recipes/me') # recipe.py
 
 if __name__ == '__main__':
     app.run()
